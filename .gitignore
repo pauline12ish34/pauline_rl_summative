@@ -1,0 +1,48 @@
+# Ignore docs folder
+docs/
+# Ignore analysis discussion file
+analysis_discussion.md
+# Ignore environment diagram
+environment_diagram.mmd
+# Python cache and environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+.venv-1/
+env/
+venv/
+*.egg-info/
+pip-log.txt
+
+# Jupyter and notebook checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Results, logs, and outputs
+results/*.csv
+results/*.npz
+results/*.gif
+results/plots/
+results/random_agent_demo/
+results/dqn_tensorboard/
+results/ppo_tensorboard/
+*.log
+
+# Model weights and checkpoints
+models/**/*.zip
+models/**/*.h5
+models/**/*.pth
+
+# Streamlit and FastAPI cache
+.streamlit/
+*.db
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.swp
