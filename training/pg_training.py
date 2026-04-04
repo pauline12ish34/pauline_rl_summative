@@ -38,6 +38,31 @@ def train_ppo_experiment(params, run_id):
     os.makedirs("./results/ppo_logs/", exist_ok=True)
     env = make_vec_env(lambda: WarehouseEnv(), n_envs=4)
     eval_env = make_vec_env(lambda: WarehouseEnv(), n_envs=1)
+
+    from stable_baselines3.common.callbacks import BaseCallback
+    from torch.utils.tensorboard import SummaryWriter
+
+    class TensorboardLossEntropyCallback(BaseCallback):
+        def __init__(self, verbose=0):
+            super().__init__(verbose)
+            self.writer = None
+        def _on_training_start(self):
+            log_dir = self.model.logger.dir if hasattr(self.model.logger, 'dir') else './results/ppo_tensorboard/'
+            self.writer = SummaryWriter(log_dir)
+        def _on_step(self) -> bool:
+            # PPO stores losses in self.model.logger.record_dict
+            if hasattr(self.model, 'logger') and hasattr(self.model.logger, 'name_to_value'):
+                loss = self.model.logger.name_to_value.get('train/loss', None)
+                entropy = self.model.logger.name_to_value.get('train/policy_entropy', None)
+                if loss is not None:
+                    self.writer.add_scalar('custom/train_loss', loss, self.num_timesteps)
+                if entropy is not None:
+                    self.writer.add_scalar('custom/policy_entropy', entropy, self.num_timesteps)
+            return True
+        def _on_training_end(self):
+            if self.writer:
+                self.writer.close()
+
     model = PPO(
         "MlpPolicy",
         env,
@@ -51,8 +76,35 @@ def train_ppo_experiment(params, run_id):
         ent_coef=params['ent_coef'],
         policy_kwargs=dict(net_arch=[256, 256]),
         verbose=0,
-        tensorboard_log=None
+        tensorboard_log="./results/ppo_tensorboard/"
     )
+
+    # Per-episode logging (evaluation, append mode)
+    episode_rewards = []
+    episode_losses = []
+    episode_entropies = []
+    eval_env_for_log = make_vec_env(lambda: WarehouseEnv(), n_envs=1)
+    for episode in range(100):
+        obs = eval_env_for_log.reset()
+        done = False
+        total_reward = 0
+        while not done:
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, done, info = eval_env_for_log.step(action)
+            total_reward += reward[0]
+            if hasattr(eval_env_for_log, 'envs') and hasattr(eval_env_for_log.envs[0], 'steps') and eval_env_for_log.envs[0].steps >= 200:
+                break
+        episode_rewards.append(total_reward)
+        episode_losses.append(None)
+        episode_entropies.append(None)
+    # Append per-episode log for every experiment
+    file_exists = os.path.isfile("./results/ppo_results.csv")
+    with open("./results/ppo_results.csv", "a", newline="") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["experiment", "episode", "reward", "loss", "entropy"])
+        for i, (r, l, e) in enumerate(zip(episode_rewards, episode_losses, episode_entropies)):
+            writer.writerow([run_id+1, i+1, r, l, e])
     eval_callback = EvalCallback(
         eval_env,
         best_model_save_path=None,
@@ -92,16 +144,22 @@ def train_reinforce_experiment(params, run_id):
     episodes = params['episodes']
     gamma = params['gamma']
     all_rewards = []
+    episode_losses = []
+    episode_entropies = []
     for episode in range(episodes):
         state, _ = env.reset()
         log_probs = []
         rewards = []
+        entropies = []
         for step in range(200):
             state_tensor = torch.from_numpy(state).float().unsqueeze(0)
             probs = policy(state_tensor)
             dist = Categorical(probs)
             action = dist.sample()
-            log_probs.append(dist.log_prob(action))
+            log_prob = dist.log_prob(action)
+            entropy = dist.entropy()
+            log_probs.append(log_prob)
+            entropies.append(entropy.item())
             state, reward, terminated, truncated, _ = env.step(action.item())
             rewards.append(reward)
             if terminated or truncated:
@@ -124,6 +182,16 @@ def train_reinforce_experiment(params, run_id):
         policy_loss.backward()
         optimizer.step()
         all_rewards.append(sum(rewards))
+        episode_losses.append(policy_loss.item())
+        episode_entropies.append(np.mean(entropies) if entropies else None)
+    # Append per-episode log for every experiment
+    file_exists = os.path.isfile("./results/reinforce_results.csv")
+    with open("./results/reinforce_results.csv", "a", newline="") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["experiment", "episode", "reward", "loss", "entropy"])
+        for i, (r, l, e) in enumerate(zip(all_rewards, episode_losses, episode_entropies)):
+            writer.writerow([run_id+1, i+1, r, l, e])
     avg_reward = np.mean(all_rewards[-10:])
     return avg_reward
 
@@ -183,3 +251,27 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # Always run per-episode logging for PPO
+    print("\n🎯 Running PPO per-episode logging for analysis...")
+    default_ppo_params = {
+        'learning_rate': 3e-4,
+        'n_steps': 1024,
+        'batch_size': 32,
+        'n_epochs': 5,
+        'gamma': 0.99,
+        'gae_lambda': 0.95,
+        'clip_range': 0.2,
+        'ent_coef': 0.01
+    }
+    train_ppo_experiment(default_ppo_params, 0)
+    print("✅ PPO per-episode logging completed! Results in results/ppo_results.csv\n")
+
+    # Always run per-episode logging for REINFORCE
+    print("\n🎯 Running REINFORCE per-episode logging for analysis...")
+    default_reinforce_params = {
+        'learning_rate': 1e-3,
+        'gamma': 0.99,
+        'episodes': 100
+    }
+    train_reinforce_experiment(default_reinforce_params, 0)
+    print("✅ REINFORCE per-episode logging completed! Results in results/reinforce_results.csv\n")

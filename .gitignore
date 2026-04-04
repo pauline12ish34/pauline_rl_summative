@@ -1,3 +1,8 @@
+# Exclude REINFORCE results CSV
+results/reinforce_results.csv
+# Exclude PPO results CSV
+results/ppo_results.csv
+results/dqn_results.csv
 # Ignore docs folder
 docs/
 # Ignore analysis discussion file
@@ -24,14 +29,20 @@ pip-log.txt
 Thumbs.db
 
 # Results, logs, and outputs
-results/*.csv
+
 results/*.npz
 results/*.gif
 results/plots/
 results/random_agent_demo/
 results/dqn_tensorboard/
 results/ppo_tensorboard/
+results/dqn_logs/
+results/ppo_logs/
+results/reinforce_logs/
 *.log
+
+# Exclude DQN results CSV
+results/dqn_results.csv
 
 # Model weights and checkpoints
 models/**/*.zip

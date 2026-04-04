@@ -79,12 +79,26 @@ if os.path.exists(dqn_path):
         plt.close()
         print(f"Saved: {os.path.join(plots_dir, 'dqn_objective_curve.png')}")
 
+    # DQN Entropy Curve (if entropy column exists)
+    if "entropy" in dqn_df.columns and not dqn_df["entropy"].isnull().all():
+        plt.figure(figsize=(8,5))
+        plt.plot(dqn_df["entropy"], label="DQN Entropy", color="green")
+        plt.xlabel("Step/Episode")
+        plt.ylabel("Entropy")
+        plt.title("DQN Entropy Curve")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(plots_dir, "dqn_entropy_curve.png"))
+        plt.close()
+        print(f"Saved: {os.path.join(plots_dir, 'dqn_entropy_curve.png')}")
+
 # 3. Policy Gradient (PG) entropy curves (if entropy column exists)
 for algo in ["REINFORCE", "PPO"]:
     path = f"results/{algo.lower()}_results.csv"
     if os.path.exists(path):
         df = pd.read_csv(path)
-        if "entropy" in df.columns:
+        # Entropy curve
+        if "entropy" in df.columns and not df["entropy"].isnull().all():
             plt.figure(figsize=(8,5))
             plt.plot(df["entropy"], label=f"{algo} Entropy")
             plt.xlabel("Step/Episode")
@@ -95,6 +109,18 @@ for algo in ["REINFORCE", "PPO"]:
             plt.savefig(os.path.join(plots_dir, f"{algo.lower()}_entropy_curve.png"))
             plt.close()
             print(f"Saved: {os.path.join(plots_dir, f'{algo.lower()}_entropy_curve.png')}")
+        # PPO Loss curve
+        if algo == "PPO" and "loss" in df.columns and not df["loss"].isnull().all():
+            plt.figure(figsize=(8,5))
+            plt.plot(df["loss"], label="PPO Loss", color="red")
+            plt.xlabel("Step/Episode")
+            plt.ylabel("Loss")
+            plt.title("PPO Loss Curve")
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(os.path.join(plots_dir, "ppo_loss_curve.png"))
+            plt.close()
+            print(f"Saved: {os.path.join(plots_dir, 'ppo_loss_curve.png')}")
 
 # 4. Convergence plots (reward over time for each method, if available)
 for algo in ["DQN", "REINFORCE", "PPO"]:
