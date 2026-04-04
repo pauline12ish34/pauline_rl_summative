@@ -33,8 +33,7 @@ Thumbs.db
 results/*.npz
 results/*.gif
 
-results/plots/
-results/random_agent_demo/
+
 results/dqn_tensorboard/
 results/ppo_tensorboard/
 results/dqn_logs/
